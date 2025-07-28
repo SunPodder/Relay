@@ -40,7 +40,7 @@ class TCPServer(
                 serverPort = serverSocket?.localPort ?: port
                 isRunning.set(true)
                 
-                UILogger.d(TAG, "TCP Server started on port: $serverPort")
+                UILogger.i(TAG, "TCP Server started on port: $serverPort")
                 
                 serverJob = CoroutineScope(Dispatchers.IO).launch {
                     acceptClientConnections()
@@ -64,7 +64,7 @@ class TCPServer(
                 try {
                     val clientSocket = serverSocket!!.accept()
                     val clientAddress = "${clientSocket.inetAddress.hostAddress}:${clientSocket.port}"
-                    UILogger.d(TAG, "New connection from: $clientAddress")
+                    UILogger.i(TAG, "New connection from: $clientAddress")
                     
                     // Delegate client handling to ClientManager
                     clientManager.handleNewClient(clientSocket)
@@ -102,7 +102,7 @@ class TCPServer(
                 serverJob?.cancel()
                 serverSocket?.close()
                 
-                UILogger.d(TAG, "TCP Server stopped")
+                UILogger.i(TAG, "TCP Server stopped")
             } catch (e: Exception) {
                 UILogger.e(TAG, "Error stopping TCP server", e)
                 onError?.invoke(e)

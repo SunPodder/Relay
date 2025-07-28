@@ -49,17 +49,11 @@ class MainActivity : AppCompatActivity(), UILogger.LogListener {
             val binder = service as RelaySocketService.LocalBinder
             relayService = binder.getService()
             isServiceBound = true
-            UILogger.d(TAG, "RelaySocketService connected")
-            
-            // Log NSD service information once connected
-            logNsdServiceInfo()
-            updateStatusDisplay()
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
             relayService = null
             isServiceBound = false
-            UILogger.d(TAG, "RelaySocketService disconnected")
             updateStatusDisplay()
         }
     }
@@ -70,8 +64,6 @@ class MainActivity : AppCompatActivity(), UILogger.LogListener {
         
         // Initialize UI elements
         initializeUI()
-        
-        UILogger.d(TAG, "MainActivity created")
         
         // Register as log listener
         UILogger.addListener(this)
@@ -211,8 +203,6 @@ class MainActivity : AppCompatActivity(), UILogger.LogListener {
             UILogger.w(TAG, "Notification listener permission not granted")
             // You can show a dialog or redirect user to settings
             redirectToNotificationListenerSettings()
-        } else {
-            UILogger.d(TAG, "Notification listener permission granted")
         }
     }
 
@@ -226,13 +216,11 @@ class MainActivity : AppCompatActivity(), UILogger.LogListener {
             action = "START_SERVICE"
         }
         startService(serviceIntent)
-        UILogger.d(TAG, "RelaySocketService start requested")
     }
 
     private fun bindRelayService() {
         val serviceIntent = Intent(this, RelaySocketService::class.java)
         bindService(serviceIntent, serviceConnection, BIND_AUTO_CREATE)
-        UILogger.d(TAG, "RelaySocketService bind requested")
     }
 
     private fun stopRelayService() {
@@ -265,19 +253,6 @@ class MainActivity : AppCompatActivity(), UILogger.LogListener {
             UILogger.d(TAG, "NSD Service: $serviceName on port $port")
             UILogger.d(TAG, "TCP Server: $tcpStatus")
             UILogger.d(TAG, "Connected clients ($clientCount): $clients")
-        }
-    }
-
-    private fun logNsdServiceInfo() {
-        relayService?.let {
-            UILogger.d(TAG, "=== Server Information ===")
-            UILogger.d(TAG, "Service Name: ${it.getServiceName()}")
-            UILogger.d(TAG, "Service Port: ${it.getServicePort()}")
-            UILogger.d(TAG, "Service Type: _relay._tcp")
-            UILogger.d(TAG, "TCP Server: ${it.getTcpServerStatus()}")
-            UILogger.d(TAG, "Device is exposed on local network for client connections")
-            UILogger.d(TAG, "Clients can connect via TCP to receive notifications")
-            UILogger.d(TAG, "==========================")
         }
     }
 }

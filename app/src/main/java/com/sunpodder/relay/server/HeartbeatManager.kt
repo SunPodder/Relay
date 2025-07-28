@@ -49,7 +49,7 @@ class HeartbeatManager(
         
         isRunning.set(true)
         heartbeatJob = CoroutineScope(Dispatchers.IO).launch {
-            UILogger.d(TAG, "Heartbeat monitoring started")
+            UILogger.i(TAG, "Heartbeat monitoring started")
             
             while (isRunning.get()) {
                 try {
@@ -84,7 +84,7 @@ class HeartbeatManager(
         heartbeatJob = null
         pendingPings.clear()
         lastPongReceived.clear()
-        UILogger.d(TAG, "Heartbeat monitoring stopped")
+        UILogger.i(TAG, "Heartbeat monitoring stopped")
     }
 
     /**
@@ -92,7 +92,7 @@ class HeartbeatManager(
      */
     fun registerClient(clientAddress: String) {
         lastPongReceived[clientAddress] = System.currentTimeMillis()
-        UILogger.d(TAG, "Client registered for heartbeat: $clientAddress")
+        // Client registered for heartbeat
     }
 
     /**
@@ -101,7 +101,7 @@ class HeartbeatManager(
     fun unregisterClient(clientAddress: String) {
         pendingPings.remove(clientAddress)
         lastPongReceived.remove(clientAddress)
-        UILogger.d(TAG, "Client unregistered from heartbeat: $clientAddress")
+        // Client unregistered from heartbeat
     }
 
     /**
@@ -112,7 +112,7 @@ class HeartbeatManager(
             // Valid pong response
             pendingPings.remove(clientAddress)
             lastPongReceived[clientAddress] = System.currentTimeMillis()
-            UILogger.d(TAG, "Valid pong received from $clientAddress")
+            // Valid pong received
         } else {
             UILogger.w(TAG, "Unexpected pong from $clientAddress (ID: $pongId)")
         }
@@ -131,7 +131,7 @@ class HeartbeatManager(
                 
                 if (pingId != null) {
                     pendingPings[clientAddress] = pingId
-                    UILogger.d(TAG, "Ping sent to $clientAddress (ID: $pingId)")
+                    // Ping sent to client
                 }
             } catch (e: Exception) {
                 UILogger.e(TAG, "Failed to send ping to $clientAddress", e)

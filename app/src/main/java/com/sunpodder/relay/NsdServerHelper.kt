@@ -24,14 +24,14 @@ class NsdServerHelper(private val context: Context) {
             setReferenceCounted(true)
             acquire()
         }
-        UILogger.d(TAG, "Multicast lock acquired")
+        UILogger.i(TAG, "Multicast lock acquired")
     }
 
     fun releaseMulticastLock() {
         multicastLock?.let {
             if (it.isHeld) {
                 it.release()
-                UILogger.d(TAG, "Multicast lock released")
+                UILogger.i(TAG, "Multicast lock released")
             }
         }
         multicastLock = null
@@ -53,14 +53,14 @@ class NsdServerHelper(private val context: Context) {
         registrationListener = object : NsdManager.RegistrationListener {
             override fun onServiceRegistered(nsdServiceInfo: NsdServiceInfo) {
                 serviceName = nsdServiceInfo.serviceName
-                UILogger.d(TAG, "NSD Server registered: $serviceName on port $port")
-                UILogger.d(TAG, "Device is now discoverable by clients on the local network")
+                UILogger.i(TAG, "NSD Server registered: $serviceName on port $port")
+                UILogger.i(TAG, "Device is now discoverable by clients on the local network")
             }
             override fun onRegistrationFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
                 UILogger.e(TAG, "NSD Server registration failed: $errorCode")
             }
             override fun onServiceUnregistered(arg0: NsdServiceInfo) {
-                UILogger.d(TAG, "NSD Server unregistered: $serviceName")
+                UILogger.i(TAG, "NSD Server unregistered: $serviceName")
             }
             override fun onUnregistrationFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
                 UILogger.e(TAG, "NSD Server unregistration failed: $errorCode")

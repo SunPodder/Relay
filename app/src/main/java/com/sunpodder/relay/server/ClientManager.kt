@@ -42,7 +42,7 @@ class ClientManager(
      */
     suspend fun handleNewClient(clientSocket: Socket) {
         val clientAddress = "${clientSocket.inetAddress.hostAddress}:${clientSocket.port}"
-        UILogger.d(TAG, "Handling new client: $clientAddress")
+        // Handling new client connection
         
         val clientHandler = ClientHandler(clientSocket, clientAddress, protocolManager)
         connectedClients[clientAddress] = clientHandler
@@ -72,7 +72,7 @@ class ClientManager(
                 protocolManager.readMessages(
                     clientHandler.getInputStream(),
                     onMessageReceived = { jsonMessage ->
-                        UILogger.d(TAG, "Received from $clientAddress: $jsonMessage")
+                        // Message received from client
                         
                         if (!connectionEstablished) {
                             // Handle connection message synchronously but launch sends
@@ -186,13 +186,13 @@ class ClientManager(
                 clientScope.launch {
                     clientHandler.sendMessage(pongMessage)
                 }
-                UILogger.d(TAG, "Ping received from $clientAddress, responded with pong")
+                // Ping-pong response sent
             }
             "pong" -> {
                 // Client responded to our ping
                 val pongId = protocolManager.parsePongMessage(jsonMessage)
                 heartbeatManager.handlePongReceived(clientAddress, pongId)
-                UILogger.d(TAG, "Pong received from $clientAddress")
+                // Pong received from client
             }
             else -> {
                 // Forward other message types to the application
@@ -210,7 +210,7 @@ class ClientManager(
             clientInfoMap.remove(clientAddress)
             heartbeatManager.unregisterClient(clientAddress)
             
-            UILogger.d(TAG, "Client disconnected: $clientAddress")
+            UILogger.i(TAG, "Client disconnected: $clientAddress")
             onClientDisconnected?.invoke(clientAddress)
         } catch (e: Exception) {
             UILogger.e(TAG, "Error disconnecting client $clientAddress", e)
@@ -230,7 +230,7 @@ class ClientManager(
      * Send message to all connected clients
      */
     suspend fun sendToAllClients(message: String) {
-        UILogger.d(TAG, "Broadcasting message to ${connectedClients.size} clients")
+        // Broadcasting to clients
         
         val disconnectedClients = mutableListOf<String>()
         
@@ -265,7 +265,7 @@ class ClientManager(
      * Send message to a specific client
      */
     suspend fun sendToClient(clientAddress: String, message: String) {
-        UILogger.d(TAG, "Sending to $clientAddress: $message")
+        // Sending message to specific client
         
         val client = connectedClients[clientAddress]
         if (client != null) {

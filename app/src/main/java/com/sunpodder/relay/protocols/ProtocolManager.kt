@@ -157,8 +157,28 @@ class ProtocolManager : BaseProtocolHandler {
     fun parsePongMessage(jsonMessage: String): String? = heartbeat.parsePongMessage(jsonMessage)
     
     // Notification Protocol
-    fun createNotificationMessage(packageName: String, title: String?, text: String?, timestamp: Long = System.currentTimeMillis()): String =
-        notification.createNotificationMessage(packageName, title, text, timestamp)
+    fun createNotificationMessage(
+        id: String,
+        title: String?,
+        text: String?,
+        app: String?,
+        packageName: String,
+        timestamp: Long = System.currentTimeMillis() / 1000,
+        canReply: Boolean = false,
+        actions: List<NotificationAction> = emptyList()
+    ): String = notification.createNotificationMessage(id, title, text, app, packageName, timestamp, canReply, actions)
+    
+    fun parseNotificationMessage(jsonMessage: String): NotificationData? =
+        notification.parseNotificationMessage(jsonMessage)
+    
+    fun parseNotificationReplyMessage(jsonMessage: String): NotificationReply? =
+        notification.parseNotificationReplyMessage(jsonMessage)
+    
+    fun parseNotificationActionMessage(jsonMessage: String): NotificationActionRequest? =
+        notification.parseNotificationActionMessage(jsonMessage)
+    
+    fun parseNotificationDismissMessage(jsonMessage: String): NotificationDismiss? =
+        notification.parseNotificationDismissMessage(jsonMessage)
     
     // System Protocol
     fun createLogMessage(message: String, level: String = "info"): String =

@@ -1,6 +1,7 @@
 package com.sunpodder.relay
 
 import com.sunpodder.relay.protocols.ProtocolManager
+import com.sunpodder.relay.protocols.NotificationAction
 import com.sunpodder.relay.server.TCPServer
 import com.sunpodder.relay.server.ClientManager
 import com.sunpodder.relay.server.HeartbeatManager
@@ -64,7 +65,6 @@ class TcpServerHelper {
     suspend fun startServer(port: Int = 0): Int {
         val serverPort = tcpServer.startServer(port)
         heartbeatManager.startHeartbeatMonitoring()
-        UILogger.d(TAG, "Server started on port: $serverPort")
         return serverPort
     }
 
@@ -72,11 +72,11 @@ class TcpServerHelper {
      * Stop the TCP server
      */
     suspend fun stopServer() {
-        UILogger.d(TAG, "Stopping server...")
+        // Server stopping
         heartbeatManager.stopHeartbeatMonitoring()
         clientManager.stopAllClients()
         tcpServer.stopServer()
-        UILogger.d(TAG, "Server stopped")
+        UILogger.i(TAG, "Server stopped")
     }
 
     /**
@@ -117,11 +117,15 @@ class TcpServerHelper {
 
     // Protocol-specific message sending methods
     suspend fun sendNotificationToAllClients(
-        packageName: String,
+        id: String,
         title: String?,
-        text: String?
+        text: String?,
+        app: String?,
+        packageName: String,
+        canReply: Boolean = false,
+        actions: List<NotificationAction> = emptyList()
     ) {
-        val message = protocolManager.createNotificationMessage(packageName, title, text)
+        val message = protocolManager.createNotificationMessage(id, title, text, app, packageName, System.currentTimeMillis() / 1000, canReply, actions)
         sendToAllClients(message)
     }
 

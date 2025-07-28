@@ -1,0 +1,111 @@
+#!/usr/bin/python3
+
+import socket
+import json
+import time
+import uuid
+
+def read_message(sock):
+    """Read a complete message from the socket (terminated by double null bytes)"""
+    message = b""
+    while True:
+        data = sock.recv(1)
+        if not data:
+            break
+        message += data
+        if message.endswith(b'\x00\x00'):
+            return message[:-2].decode('utf-8')
+    return message.decode('utf-8') if message else None
+
+def send_message(sock, message):
+    """Send a message with proper termination"""
+    message_bytes = message.encode('utf-8') + b'\x00\x00'
+    sock.send(message_bytes)
+
+def listen_for_notifications():
+    """Connect to server and listen for notification messages"""
+    
+    # Connect to server
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.connect(('192.168.1.102', 9999))
+        print("Connected to Relay Server!")
+        
+        # Send conn message
+        conn_msg = {
+            "type": "conn",
+            "id": str(uuid.uuid4()),
+            "timestamp": int(time.time()),
+            "payload": {
+                "device_name": "Notification-Listener",
+                "platform": "linux",
+                "version": "1.0.0",
+                "supports": ["notification"],
+                "auth_token": "test-token-123"
+            }
+        }
+        
+        print("Sending connection request...")
+        send_message(sock, json.dumps(conn_msg))
+        
+        # Wait for ack
+        response = read_message(sock)
+        if response:
+            ack = json.loads(response)
+            if ack.get("type") == "ack" and ack.get("payload", {}).get("status") == "ok":
+                print("✅ Connected! Listening for notifications...")
+                print("Trigger some notifications on your Android device to see them here.")
+                print("Press Ctrl+C to exit.")
+                print("")
+            else:
+                print("❌ Connection failed:", ack)
+                return
+        
+        # Listen for messages
+        while True:
+            try:
+                message = read_message(sock)
+                if message:
+                    data = json.loads(message)
+                    msg_type = data.get("type")
+                    
+                    if msg_type == "notification":
+                        payload = data.get("payload", {})
+                        print(f"🔔 NOTIFICATION:")
+                        print(f"   App: {payload.get('app', 'Unknown')}")
+                        print(f"   Title: {payload.get('title', '')}")
+                        print(f"   Text: {payload.get('text', '')}")
+                        print(f"   Package: {payload.get('package', '')}")
+                        print(f"   Can Reply: {payload.get('can_reply', False)}")
+                        if payload.get('actions'):
+                            print(f"   Actions: {len(payload['actions'])} available")
+                        print("")
+                    
+                    elif msg_type == "ping":
+                        # Respond to ping
+                        pong_msg = {
+                            "type": "pong",
+                            "id": data.get("id"),
+                            "timestamp": int(time.time()),
+                            "payload": {"device": "Notification-Listener"}
+                        }
+                        send_message(sock, json.dumps(pong_msg))
+                        print("📤 Responded to ping")
+                    
+                    else:
+                        print(f"📨 Received {msg_type} message")
+                        
+            except KeyboardInterrupt:
+                print("\n👋 Disconnecting...")
+                break
+            except Exception as e:
+                print(f"❌ Error: {e}")
+                break
+                
+    except Exception as e:
+        print(f"❌ Connection error: {e}")
+    finally:
+        sock.close()
+
+if __name__ == "__main__":
+    listen_for_notifications()

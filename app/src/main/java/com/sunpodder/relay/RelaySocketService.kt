@@ -32,7 +32,6 @@ class RelaySocketService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        UILogger.d(TAG, "RelaySocketService created")
         
         // Initialize helpers
         nsdServerHelper = NsdServerHelper(this)
@@ -46,8 +45,6 @@ class RelaySocketService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        UILogger.d(TAG, "RelaySocketService started")
-        
         when (intent?.action) {
             "START_SERVICE" -> {
                 startBackgroundService()
@@ -65,18 +62,16 @@ class RelaySocketService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder {
-        UILogger.d(TAG, "RelaySocketService bound")
         return binder
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
-        UILogger.d(TAG, "RelaySocketService unbound")
         return super.onUnbind(intent)
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        UILogger.d(TAG, "RelaySocketService destroyed")
+        UILogger.i(TAG, "RelaySocketService destroyed")
         isServiceRunning = false
         
         // Cancel all coroutines
@@ -93,7 +88,7 @@ class RelaySocketService : Service() {
     private fun startBackgroundService() {
         if (!isServiceRunning) {
             isServiceRunning = true
-            UILogger.d(TAG, "RelaySocketService started in background")
+            UILogger.i(TAG, "RelaySocketService started")
             
             // Initialize relay functionality
             initializeRelayFunctionality()
@@ -104,7 +99,7 @@ class RelaySocketService : Service() {
         if (isServiceRunning) {
             isServiceRunning = false
             stopSelf()
-            UILogger.d(TAG, "RelaySocketService stopped")
+            UILogger.i(TAG, "RelaySocketService stopped")
             
             // Unregister NSD service
             nsdServerHelper.unregisterNsdService()
@@ -119,12 +114,21 @@ class RelaySocketService : Service() {
             try {
                 // Start TCP server
                 servicePort = tcpServerHelper.startServer(DEFAULT_PORT)
-                UILogger.d(TAG, "TCP server started on port: $servicePort")
+                
+                // Connect NotificationListenerService to TCP server for broadcasting
+                if (NotificationListenerHelper.isNotificationListenerEnabled(this@RelaySocketService)) {
+                    if (NotificationListenerService.instance != null) {
+                        NotificationListenerService.instance?.setTcpServerHelper(tcpServerHelper)
+                        // Reduced logging - only log connection failure
+                    } else {
+                        UILogger.w(TAG, "NotificationListenerService not available")
+                    }
+                } else {
+                    UILogger.w(TAG, "Notification access permission not granted")
+                }
                 
                 // Register NSD service with the actual port
                 nsdServerHelper.registerNsdService(servicePort)
-                
-                UILogger.d(TAG, "Relay functionality initialized successfully")
             } catch (e: Exception) {
                 UILogger.e(TAG, "Failed to initialize relay functionality", e)
             }
@@ -134,11 +138,13 @@ class RelaySocketService : Service() {
     private fun cleanupRelayFunctionality() {
         serviceScope.launch {
             try {
+                // Disconnect NotificationListenerService
+                NotificationListenerService.instance?.setTcpServerHelper(null)
+                
                 // Stop TCP server
                 tcpServerHelper.stopServer()
-                UILogger.d(TAG, "TCP server stopped")
                 
-                UILogger.d(TAG, "Relay functionality cleaned up")
+                UILogger.i(TAG, "Relay functionality cleaned up")
             } catch (e: Exception) {
                 UILogger.e(TAG, "Error during cleanup", e)
             }
@@ -147,16 +153,16 @@ class RelaySocketService : Service() {
 
     private fun setupTcpServerCallbacks() {
         tcpServerHelper.onClientConnected = { clientAddress ->
-            UILogger.d(TAG, "Client connected: $clientAddress")
+            UILogger.i(TAG, "Client connected: $clientAddress")
             // TODO: Handle client connection (maybe notify NotificationListenerService)
         }
 
         tcpServerHelper.onClientDisconnected = { clientAddress ->
-            UILogger.d(TAG, "Client disconnected: $clientAddress")
+            UILogger.i(TAG, "Client disconnected: $clientAddress")
             // TODO: Handle client disconnection
         }
 
-        tcpServerHelper.onDataReceived = { clientAddress, data ->
+        tcpServerHelper.onDataReceived = { _, _ ->
             // TODO: Process received data
         }
 
@@ -173,7 +179,6 @@ class RelaySocketService : Service() {
 
     fun sendData(data: String) {
         if (isServiceRunning) {
-            UILogger.d(TAG, "Broadcasting data: $data")
             serviceScope.launch {
                 tcpServerHelper.sendToAllClients(data)
             }
@@ -184,7 +189,6 @@ class RelaySocketService : Service() {
 
     fun sendDataToClient(clientAddress: String, data: String) {
         if (isServiceRunning) {
-            UILogger.d(TAG, "Sending data to $clientAddress: $data")
             serviceScope.launch {
                 tcpServerHelper.sendToClient(clientAddress, data)
             }
@@ -236,9 +240,16 @@ class RelaySocketService : Service() {
     // Message-based API methods
     fun sendNotificationToClients(packageName: String, title: String?, text: String?) {
         if (isServiceRunning) {
-            UILogger.d(TAG, "Sending notification to clients: $packageName - $title")
             serviceScope.launch {
-                tcpServerHelper.sendNotificationToAllClients(packageName, title, text)
+                // Generate a unique ID for the notification
+                val notificationId = "${packageName}_${System.currentTimeMillis()}"
+                tcpServerHelper.sendNotificationToAllClients(
+                    id = notificationId,
+                    title = title,
+                    text = text,
+                    app = packageName, // Use package name as app name for now
+                    packageName = packageName
+                )
             }
         } else {
             UILogger.w(TAG, "Service is not running, cannot send notification")
@@ -247,7 +258,6 @@ class RelaySocketService : Service() {
 
     fun sendLogToClients(message: String, level: String = "info") {
         if (isServiceRunning) {
-            UILogger.d(TAG, "Sending log to clients: $message")
             serviceScope.launch {
                 tcpServerHelper.sendLogToAllClients(message, level)
             }
@@ -258,7 +268,6 @@ class RelaySocketService : Service() {
 
     fun sendErrorToClients(error: String, code: Int = 0) {
         if (isServiceRunning) {
-            UILogger.d(TAG, "Sending error to clients: $error")
             serviceScope.launch {
                 tcpServerHelper.sendErrorToAllClients(error, code)
             }
@@ -269,7 +278,6 @@ class RelaySocketService : Service() {
 
     fun sendStatusToClients(status: String) {
         if (isServiceRunning) {
-            UILogger.d(TAG, "Sending status to clients: $status")
             serviceScope.launch {
                 tcpServerHelper.sendStatusToAllClients(status)
             }
