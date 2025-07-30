@@ -28,7 +28,7 @@ def listen_for_notifications():
     # Connect to server
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
-        sock.connect(('192.168.1.102', 9999))
+        sock.connect(('192.168.1.103', 9999))
         print("Connected to Relay Server!")
         
         # Send conn message
@@ -74,7 +74,7 @@ def listen_for_notifications():
                         print(f"🔔 NOTIFICATION:")
                         print(f"   App: {payload.get('app', 'Unknown')}")
                         print(f"   Title: {payload.get('title', '')}")
-                        print(f"   Text: {payload.get('text', '')}")
+                        print(f"   Body: {payload.get('body', '')}")
                         print(f"   Package: {payload.get('package', '')}")
                         print(f"   Can Reply: {payload.get('can_reply', False)}")
                         if payload.get('actions'):

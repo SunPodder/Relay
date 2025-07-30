@@ -20,7 +20,7 @@ Sent from Android to Desktop to inform about a new or updated notification.
   "payload": {
     "id": "abc123",                // Unique notification key (see Notes)
     "title": "Messenger",
-    "text": "Hey, what's up?",
+    "body": "Hey, what's up?",
     "app": "Messenger",
     "package": "com.facebook.orca",
     "timestamp": 1729612345,
@@ -89,7 +89,7 @@ Sent from Desktop to Android to dismiss the notification.
   "payload": {
     "id": "abc123",
     "title": "Messenger",
-    "text": "Hey, what's up?",
+    "body": "Hey, what's up?",
     "app": "Messenger",
     "package": "com.facebook.orca",
     "timestamp": 1729612345,

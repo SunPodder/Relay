@@ -119,13 +119,13 @@ class TcpServerHelper {
     suspend fun sendNotificationToAllClients(
         id: String,
         title: String?,
-        text: String?,
+        body: String?,
         app: String?,
         packageName: String,
         canReply: Boolean = false,
         actions: List<NotificationAction> = emptyList()
     ) {
-        val message = protocolManager.createNotificationMessage(id, title, text, app, packageName, System.currentTimeMillis() / 1000, canReply, actions)
+        val message = protocolManager.createNotificationMessage(id, title, body, app, packageName, System.currentTimeMillis() / 1000, canReply, actions)
         sendToAllClients(message)
     }
 

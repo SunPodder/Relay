@@ -115,7 +115,7 @@ class NotificationListenerService : AndroidNotificationListenerService() {
                     server.sendNotificationToAllClients(
                         id = notificationId,
                         title = title,
-                        text = finalText,
+                        body = finalText,
                         app = appName,
                         packageName = packageName,
                         canReply = canReply,

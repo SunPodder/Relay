@@ -238,7 +238,7 @@ class RelaySocketService : Service() {
     }
 
     // Message-based API methods
-    fun sendNotificationToClients(packageName: String, title: String?, text: String?) {
+    fun sendNotificationToClients(packageName: String, title: String?, body: String?) {
         if (isServiceRunning) {
             serviceScope.launch {
                 // Generate a unique ID for the notification
@@ -246,7 +246,7 @@ class RelaySocketService : Service() {
                 tcpServerHelper.sendNotificationToAllClients(
                     id = notificationId,
                     title = title,
-                    text = text,
+                    body = body,
                     app = packageName, // Use package name as app name for now
                     packageName = packageName
                 )

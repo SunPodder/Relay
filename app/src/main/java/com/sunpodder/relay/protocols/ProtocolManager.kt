@@ -160,13 +160,13 @@ class ProtocolManager : BaseProtocolHandler {
     fun createNotificationMessage(
         id: String,
         title: String?,
-        text: String?,
+        body: String?,
         app: String?,
         packageName: String,
         timestamp: Long = System.currentTimeMillis() / 1000,
         canReply: Boolean = false,
         actions: List<NotificationAction> = emptyList()
-    ): String = notification.createNotificationMessage(id, title, text, app, packageName, timestamp, canReply, actions)
+    ): String = notification.createNotificationMessage(id, title, body, app, packageName, timestamp, canReply, actions)
     
     fun parseNotificationMessage(jsonMessage: String): NotificationData? =
         notification.parseNotificationMessage(jsonMessage)

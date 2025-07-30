@@ -14,7 +14,7 @@ class NotificationProtocolHandler : BaseProtocolHandler {
     fun createNotificationMessage(
         id: String,
         title: String?,
-        text: String?,
+        body: String?,
         app: String?,
         packageName: String,
         timestamp: Long = System.currentTimeMillis() / 1000, // Convert to seconds
@@ -25,7 +25,7 @@ class NotificationProtocolHandler : BaseProtocolHandler {
             put("payload", JSONObject().apply {
                 put("id", id)
                 put("title", title ?: "")
-                put("text", text ?: "")
+                put("body", body ?: "")
                 put("app", app ?: "")
                 put("package", packageName)
                 put("timestamp", timestamp)
@@ -105,7 +105,7 @@ class NotificationProtocolHandler : BaseProtocolHandler {
             NotificationData(
                 id = payload.getString("id"),
                 title = payload.optString("title", ""),
-                text = payload.optString("text", ""),
+                body = payload.optString("body", ""),
                 app = payload.optString("app", ""),
                 packageName = payload.getString("package"),
                 timestamp = payload.getLong("timestamp"),
@@ -198,7 +198,7 @@ data class NotificationAction(
 data class NotificationData(
     val id: String,
     val title: String,
-    val text: String,
+    val body: String,
     val app: String,
     val packageName: String,
     val timestamp: Long,
