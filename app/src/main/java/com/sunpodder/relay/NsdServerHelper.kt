@@ -10,7 +10,7 @@ class NsdServerHelper(private val context: Context) {
     companion object {
         private const val TAG = "NsdServerHelper"
         private const val SERVICE_TYPE = "_relay._tcp"
-        private const val SERVICE_NAME = "RelayDevice"
+        private const val SERVICE_NAME = "RelayServer"
     }
 
     private var nsdManager: NsdManager? = null
