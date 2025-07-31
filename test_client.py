@@ -8,6 +8,7 @@ import socket
 import json
 import uuid
 import time
+import struct
 
 def create_pong_message(ping_id=None):
     """Create a pong message in response to a ping."""
@@ -40,25 +41,47 @@ def create_conn_message():
     }
 
 def send_message(sock, message_dict):
-    """Send a JSON message with protocol terminator."""
+    """Send a JSON message with 4-byte length prefix."""
     message_json = json.dumps(message_dict)
-    message_with_terminator = message_json + "\x00\x00"
-    sock.send(message_with_terminator.encode('utf-8'))
+    message_bytes = message_json.encode('utf-8')
+    message_length = len(message_bytes)
+    
+    # Create 4-byte big-endian length prefix
+    length_prefix = struct.pack('>I', message_length)
+    
+    # Send length prefix followed by message
+    sock.send(length_prefix + message_bytes)
     print(f"Sent: {message_json}")
 
 def read_message(sock):
-    """Read a JSON message from socket until terminator."""
-    buffer = b""
-    while True:
-        data = sock.recv(1)
-        if not data:
-            break
-        buffer += data
-        if buffer.endswith(b"\x00\x00"):
-            # Remove terminator and decode
-            message = buffer[:-2].decode('utf-8')
-            return json.loads(message) if message else None
-    return None
+    """Read a JSON message from socket using 4-byte length prefix."""
+    try:
+        # First, read the 4-byte length prefix
+        length_data = b""
+        while len(length_data) < 4:
+            chunk = sock.recv(4 - len(length_data))
+            if not chunk:
+                return None
+            length_data += chunk
+        
+        # Unpack the length (big-endian unsigned int)
+        message_length = struct.unpack('>I', length_data)[0]
+        
+        # Read the message data
+        message_data = b""
+        while len(message_data) < message_length:
+            chunk = sock.recv(message_length - len(message_data))
+            if not chunk:
+                return None
+            message_data += chunk
+        
+        # Decode and parse JSON
+        message_json = message_data.decode('utf-8')
+        return json.loads(message_json)
+        
+    except Exception as e:
+        print(f"Error reading message: {e}")
+        return None
 
 def test_conn_protocol():
     """Test the conn/ack protocol with the Relay server."""

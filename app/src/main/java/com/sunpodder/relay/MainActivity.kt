@@ -243,21 +243,4 @@ class MainActivity : AppCompatActivity(), UILogger.LogListener {
             service.sendData(testMessage)
         }
     }
-
-    private fun checkServiceStatus() {
-        relayService?.let {
-            val status = it.getConnectionStatus()
-            val isRunning = it.isRunning()
-            val port = it.getServicePort()
-            val serviceName = it.getServiceName()
-            val tcpStatus = it.getTcpServerStatus()
-            val clientCount = it.getConnectedClientsCount()
-            val clients = it.getConnectedClients()
-            
-            UILogger.d(TAG, "Service status: $status, Running: $isRunning")
-            UILogger.d(TAG, "NSD Service: $serviceName on port $port")
-            UILogger.d(TAG, "TCP Server: $tcpStatus")
-            UILogger.d(TAG, "Connected clients ($clientCount): $clients")
-        }
-    }
 }

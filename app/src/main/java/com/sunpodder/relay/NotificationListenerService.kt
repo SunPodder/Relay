@@ -105,9 +105,6 @@ class NotificationListenerService : AndroidNotificationListenerService() {
 
         // Use StatusBarNotification key as unique ID, fallback to package + timestamp
         val notificationId = key ?: "${packageName}_${postTime}"
-
-        UILogger.d(TAG, "Broadcasting: '$title' from $appName")
-
         // Broadcast to connected clients
         tcpServerHelper?.let { server ->
             CoroutineScope(Dispatchers.IO).launch {

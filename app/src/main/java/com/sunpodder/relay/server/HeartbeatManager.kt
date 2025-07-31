@@ -129,19 +129,15 @@ class HeartbeatManager(
         for (clientAddress in clientAddresses) {
             try {
                 val pingMessage = protocolManager.createPingMessage()
-                // We need to convert ByteArray back to JSON string for extracting ping ID
-                val pingJson = JSONObject().apply {
-                    put("type", "ping")
-                    put("id", UUID.randomUUID().toString())
-                    put("timestamp", System.currentTimeMillis() / 1000)
-                    put("payload", JSONObject().apply {
-                        put("device", "Relay-Server")
-                    })
-                }.toString()
                 
-                val pingId = clientManager?.sendPingToClient(clientAddress, pingMessage, pingJson)
+                // Extract the ping ID from the message for tracking
+                val pingJsonString = String(pingMessage.sliceArray(4 until pingMessage.size), Charsets.UTF_8)
+                val pingJson = JSONObject(pingJsonString)
+                val pingId = pingJson.getString("id")
+
+                val success = clientManager?.sendPingToClient(clientAddress, pingMessage, pingJsonString)
                 
-                if (pingId != null) {
+                if (success != null) {
                     pendingPings[clientAddress] = pingId
                     // Ping sent to client
                 }
