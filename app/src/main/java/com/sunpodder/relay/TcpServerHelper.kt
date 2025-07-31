@@ -82,14 +82,14 @@ class TcpServerHelper {
     /**
      * Send message to all connected clients
      */
-    suspend fun sendToAllClients(message: String) {
+    suspend fun sendToAllClients(message: ByteArray) {
         clientManager.sendToAllClients(message)
     }
 
     /**
      * Send message to a specific client
      */
-    suspend fun sendToClient(clientAddress: String, message: String) {
+    suspend fun sendToClient(clientAddress: String, message: ByteArray) {
         clientManager.sendToClient(clientAddress, message)
     }
 

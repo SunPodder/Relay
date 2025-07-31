@@ -3,6 +3,8 @@ package com.sunpodder.relay.server
 import com.sunpodder.relay.UILogger
 import com.sunpodder.relay.protocols.ProtocolManager
 import kotlinx.coroutines.*
+import org.json.JSONObject
+import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -127,7 +129,17 @@ class HeartbeatManager(
         for (clientAddress in clientAddresses) {
             try {
                 val pingMessage = protocolManager.createPingMessage()
-                val pingId = clientManager?.sendPingToClient(clientAddress, pingMessage)
+                // We need to convert ByteArray back to JSON string for extracting ping ID
+                val pingJson = JSONObject().apply {
+                    put("type", "ping")
+                    put("id", UUID.randomUUID().toString())
+                    put("timestamp", System.currentTimeMillis() / 1000)
+                    put("payload", JSONObject().apply {
+                        put("device", "Relay-Server")
+                    })
+                }.toString()
+                
+                val pingId = clientManager?.sendPingToClient(clientAddress, pingMessage, pingJson)
                 
                 if (pingId != null) {
                     pendingPings[clientAddress] = pingId

@@ -1,21 +1,21 @@
 package com.sunpodder.relay.protocols
 
 import org.json.JSONObject
+import java.nio.ByteBuffer
 import java.util.*
 
 /**
  * Base interface for all protocol handlers
  */
 interface BaseProtocolHandler {
-    companion object {
-        const val MESSAGE_TERMINATOR = "\u0000\u0000" // \0\0
-    }
     
     /**
-     * Formats a JSON message with the protocol terminator
+     * Formats a JSON message with length prefix (4-byte big-endian)
      */
-    fun formatMessage(jsonString: String): String {
-        return jsonString + MESSAGE_TERMINATOR
+    fun formatMessage(jsonString: String): ByteArray {
+        val messageBytes = jsonString.toByteArray(Charsets.UTF_8)
+        val lengthPrefix = ByteBuffer.allocate(4).putInt(messageBytes.size).array()
+        return lengthPrefix + messageBytes
     }
     
     /**

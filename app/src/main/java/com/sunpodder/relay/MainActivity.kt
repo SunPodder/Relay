@@ -236,7 +236,12 @@ class MainActivity : AppCompatActivity(), UILogger.LogListener {
 
     // Example methods to interact with the relay service
     private fun sendTestData() {
-        relayService?.sendData("Test message from MainActivity")
+        relayService?.let { service ->
+            // Create a test system message using the protocol handler
+            val systemHandler = com.sunpodder.relay.protocols.SystemProtocolHandler()
+            val testMessage = systemHandler.createLogMessage("Test message from MainActivity", "info")
+            service.sendData(testMessage)
+        }
     }
 
     private fun checkServiceStatus() {

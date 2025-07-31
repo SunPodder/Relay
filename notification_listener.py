@@ -4,23 +4,49 @@ import socket
 import json
 import time
 import uuid
+import struct
 
 def read_message(sock):
-    """Read a complete message from the socket (terminated by double null bytes)"""
-    message = b""
-    while True:
-        data = sock.recv(1)
-        if not data:
-            break
-        message += data
-        if message.endswith(b'\x00\x00'):
-            return message[:-2].decode('utf-8')
-    return message.decode('utf-8') if message else None
+    """Read a complete message from the socket using length prefix"""
+    try:
+        # Read the 4-byte length prefix (big-endian unsigned int)
+        length_data = b""
+        while len(length_data) < 4:
+            chunk = sock.recv(4 - len(length_data))
+            if not chunk:
+                return None
+            length_data += chunk
+        
+        # Unpack the length (big-endian)
+        message_length = struct.unpack('>I', length_data)[0]
+        
+        # Read the JSON message of specified length
+        message_data = b""
+        while len(message_data) < message_length:
+            chunk = sock.recv(message_length - len(message_data))
+            if not chunk:
+                return None
+            message_data += chunk
+        
+        return message_data.decode('utf-8')
+    except Exception as e:
+        print(f"Error reading message: {e}")
+        return None
 
 def send_message(sock, message):
-    """Send a message with proper termination"""
-    message_bytes = message.encode('utf-8') + b'\x00\x00'
-    sock.send(message_bytes)
+    """Send a message with length prefix"""
+    try:
+        # Encode the JSON message
+        message_bytes = message.encode('utf-8')
+        message_length = len(message_bytes)
+        
+        # Create 4-byte big-endian length prefix
+        length_prefix = struct.pack('>I', message_length)
+        
+        # Send length prefix followed by message
+        sock.send(length_prefix + message_bytes)
+    except Exception as e:
+        print(f"Error sending message: {e}")
 
 def listen_for_notifications():
     """Connect to server and listen for notification messages"""

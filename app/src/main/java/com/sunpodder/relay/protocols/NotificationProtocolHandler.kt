@@ -20,7 +20,7 @@ class NotificationProtocolHandler : BaseProtocolHandler {
         timestamp: Long = System.currentTimeMillis() / 1000, // Convert to seconds
         canReply: Boolean = false,
         actions: List<NotificationAction> = emptyList()
-    ): String {
+    ): ByteArray {
         val notificationJson = createBaseMessage("notification").apply {
             put("payload", JSONObject().apply {
                 put("id", id)
@@ -53,7 +53,7 @@ class NotificationProtocolHandler : BaseProtocolHandler {
         notificationId: String,
         key: String,
         text: String
-    ): String {
+    ): ByteArray {
         val replyJson = createBaseMessage("notification_reply").apply {
             put("payload", JSONObject().apply {
                 put("id", notificationId)
@@ -70,7 +70,7 @@ class NotificationProtocolHandler : BaseProtocolHandler {
     fun createNotificationActionMessage(
         notificationId: String,
         key: String
-    ): String {
+    ): ByteArray {
         val actionJson = createBaseMessage("notification_action").apply {
             put("payload", JSONObject().apply {
                 put("id", notificationId)
@@ -85,7 +85,7 @@ class NotificationProtocolHandler : BaseProtocolHandler {
      */
     fun createNotificationDismissMessage(
         notificationId: String
-    ): String {
+    ): ByteArray {
         val dismissJson = createBaseMessage("notification_dismiss").apply {
             put("payload", JSONObject().apply {
                 put("id", notificationId)

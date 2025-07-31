@@ -24,10 +24,9 @@ class ProtocolManager : BaseProtocolHandler {
     /**
      * Sends a message through an OutputStream
      */
-    fun sendMessage(outputStream: OutputStream, message: String) {
+    fun sendMessage(outputStream: OutputStream, message: ByteArray) {
         try {
-            val bytes = message.toByteArray(StandardCharsets.UTF_8)
-            outputStream.write(bytes)
+            outputStream.write(message)
             outputStream.flush()
         } catch (e: IOException) {
             UILogger.e(TAG, "Failed to send message", e)
@@ -36,7 +35,7 @@ class ProtocolManager : BaseProtocolHandler {
     }
 
     /**
-     * Reads messages from an InputStream using the protocol
+     * Reads messages from an InputStream using length-prefixed protocol
      */
     fun readMessages(
         inputStream: InputStream,
@@ -44,51 +43,54 @@ class ProtocolManager : BaseProtocolHandler {
         onError: (Exception) -> Unit
     ) {
         try {
-            val messageBuffer = StringBuilder()
-            
             while (true) {
-                val byte = inputStream.read()
-                if (byte == -1) {
-                    break
-                }
+                // Read 4-byte length prefix (big-endian)
+                val lengthBytes = ByteArray(4)
+                var bytesRead = 0
                 
-                val char = byte.toChar()
-                messageBuffer.append(char)
-                
-                // Check if we have the terminator at the end
-                if (messageBuffer.length >= BaseProtocolHandler.MESSAGE_TERMINATOR.length) {
-                    val bufferEnd = messageBuffer.substring(
-                        messageBuffer.length - BaseProtocolHandler.MESSAGE_TERMINATOR.length
-                    )
-                    
-                    if (bufferEnd == BaseProtocolHandler.MESSAGE_TERMINATOR) {
-                        // Found complete message, remove terminator
-                        val completeMessage = messageBuffer.substring(
-                            0, 
-                            messageBuffer.length - BaseProtocolHandler.MESSAGE_TERMINATOR.length
-                        )
-                        
-                        if (completeMessage.isNotEmpty()) {
-                            try {
-                                // Validate JSON
-                                JSONObject(completeMessage)
-                                onMessageReceived(completeMessage)
-                            } catch (e: Exception) {
-                                UILogger.e(TAG, "Invalid JSON message: $completeMessage", e)
-                                onError(IllegalArgumentException("Invalid JSON message", e))
-                            }
-                        }
-                        
-                        // Clear buffer for next message
-                        messageBuffer.clear()
+                while (bytesRead < 4) {
+                    val read = inputStream.read(lengthBytes, bytesRead, 4 - bytesRead)
+                    if (read == -1) {
+                        return // End of stream
                     }
+                    bytesRead += read
                 }
                 
-                // Safety check to prevent extremely large messages from consuming too much memory
-                if (messageBuffer.length > 1024 * 1024) { // 1MB limit
-                    UILogger.w(TAG, "Message too large, clearing buffer")
-                    messageBuffer.clear()
-                    onError(IllegalStateException("Message size limit exceeded"))
+                // Convert to message length (big-endian)
+                val messageLength = ((lengthBytes[0].toInt() and 0xFF) shl 24) or
+                                  ((lengthBytes[1].toInt() and 0xFF) shl 16) or
+                                  ((lengthBytes[2].toInt() and 0xFF) shl 8) or
+                                  (lengthBytes[3].toInt() and 0xFF)
+                
+                // Validate message length
+                if (messageLength <= 0 || messageLength > 1024 * 1024) { // Max 1MB
+                    onError(IllegalArgumentException("Invalid message length: $messageLength"))
+                    return
+                }
+                
+                // Read the message of specified length
+                val messageBytes = ByteArray(messageLength)
+                bytesRead = 0
+                
+                while (bytesRead < messageLength) {
+                    val read = inputStream.read(messageBytes, bytesRead, messageLength - bytesRead)
+                    if (read == -1) {
+                        onError(IllegalStateException("Unexpected end of stream while reading message"))
+                        return
+                    }
+                    bytesRead += read
+                }
+                
+                // Convert to string and validate JSON
+                val messageString = String(messageBytes, StandardCharsets.UTF_8)
+                
+                try {
+                    // Validate JSON
+                    JSONObject(messageString)
+                    onMessageReceived(messageString)
+                } catch (e: Exception) {
+                    UILogger.e(TAG, "Invalid JSON message: $messageString", e)
+                    onError(IllegalArgumentException("Invalid JSON message", e))
                 }
             }
         } catch (e: IOException) {
@@ -123,36 +125,18 @@ class ProtocolManager : BaseProtocolHandler {
         }
     }
 
-    /**
-     * Validates if a string is a properly formatted protocol message
-     */
-    fun isValidMessage(message: String): Boolean {
-        return try {
-            val jsonPart = if (message.endsWith(BaseProtocolHandler.MESSAGE_TERMINATOR)) {
-                message.substring(0, message.length - BaseProtocolHandler.MESSAGE_TERMINATOR.length)
-            } else {
-                message
-            }
-            
-            val json = JSONObject(jsonPart)
-            json.has("type") && json.has("timestamp")
-        } catch (e: Exception) {
-            false
-        }
-    }
-
     // Convenience methods that delegate to specific protocol handlers
     
     // Connection Protocol
-    fun createAckMessage(refId: String?, status: String = "ok", reason: String? = null): String =
+    fun createAckMessage(refId: String?, status: String = "ok", reason: String? = null): ByteArray =
         connection.createAckMessage(refId, status, reason)
     
     fun parseConnMessage(jsonMessage: String, clientAddress: String): ClientInfo? =
         connection.parseConnMessage(jsonMessage, clientAddress)
     
     // Heartbeat Protocol
-    fun createPingMessage(): String = heartbeat.createPingMessage()
-    fun createPongMessage(pingId: String? = null): String = heartbeat.createPongMessage(pingId)
+    fun createPingMessage(): ByteArray = heartbeat.createPingMessage()
+    fun createPongMessage(pingId: String? = null): ByteArray = heartbeat.createPongMessage(pingId)
     fun parsePingMessage(jsonMessage: String): String? = heartbeat.parsePingMessage(jsonMessage)
     fun parsePongMessage(jsonMessage: String): String? = heartbeat.parsePongMessage(jsonMessage)
     
@@ -166,7 +150,7 @@ class ProtocolManager : BaseProtocolHandler {
         timestamp: Long = System.currentTimeMillis() / 1000,
         canReply: Boolean = false,
         actions: List<NotificationAction> = emptyList()
-    ): String = notification.createNotificationMessage(id, title, body, app, packageName, timestamp, canReply, actions)
+    ): ByteArray = notification.createNotificationMessage(id, title, body, app, packageName, timestamp, canReply, actions)
     
     fun parseNotificationMessage(jsonMessage: String): NotificationData? =
         notification.parseNotificationMessage(jsonMessage)
@@ -181,12 +165,12 @@ class ProtocolManager : BaseProtocolHandler {
         notification.parseNotificationDismissMessage(jsonMessage)
     
     // System Protocol
-    fun createLogMessage(message: String, level: String = "info"): String =
+    fun createLogMessage(message: String, level: String = "info"): ByteArray =
         system.createLogMessage(message, level)
     
-    fun createErrorMessage(error: String, code: Int = 0): String =
+    fun createErrorMessage(error: String, code: Int = 0): ByteArray =
         system.createErrorMessage(error, code)
     
-    fun createStatusMessage(status: String, data: JSONObject? = null): String =
+    fun createStatusMessage(status: String, data: JSONObject? = null): ByteArray =
         system.createStatusMessage(status, data)
 }

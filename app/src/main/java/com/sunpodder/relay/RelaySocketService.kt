@@ -177,7 +177,7 @@ class RelaySocketService : Service() {
         return isServiceRunning
     }
 
-    fun sendData(data: String) {
+    fun sendData(data: ByteArray) {
         if (isServiceRunning) {
             serviceScope.launch {
                 tcpServerHelper.sendToAllClients(data)
@@ -187,7 +187,7 @@ class RelaySocketService : Service() {
         }
     }
 
-    fun sendDataToClient(clientAddress: String, data: String) {
+    fun sendDataToClient(clientAddress: String, data: ByteArray) {
         if (isServiceRunning) {
             serviceScope.launch {
                 tcpServerHelper.sendToClient(clientAddress, data)

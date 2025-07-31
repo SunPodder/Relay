@@ -119,7 +119,7 @@ class ClientManager(
     private fun handleConnectionMessageSync(
         jsonMessage: String, 
         clientAddress: String
-    ): Pair<ClientInfo, String>? {
+    ): Pair<ClientInfo, ByteArray>? {
         val messageType = protocolManager.parseMessageType(jsonMessage)
         
         if (messageType == "conn") {
@@ -229,7 +229,7 @@ class ClientManager(
     /**
      * Send message to all connected clients
      */
-    suspend fun sendToAllClients(message: String) {
+    suspend fun sendToAllClients(message: ByteArray) {
         // Broadcasting to clients
         
         val disconnectedClients = mutableListOf<String>()
@@ -264,7 +264,7 @@ class ClientManager(
     /**
      * Send message to a specific client
      */
-    suspend fun sendToClient(clientAddress: String, message: String) {
+    suspend fun sendToClient(clientAddress: String, message: ByteArray) {
         // Sending message to specific client
         
         val client = connectedClients[clientAddress]
@@ -286,7 +286,7 @@ class ClientManager(
     /**
      * Send ping to a specific client
      */
-    suspend fun sendPingToClient(clientAddress: String, pingMessage: String): String? {
+    suspend fun sendPingToClient(clientAddress: String, pingMessage: ByteArray, originalJson: String): String? {
         val client = connectedClients[clientAddress]
         if (client != null) {
             try {
@@ -294,7 +294,7 @@ class ClientManager(
                 
                 // Extract ping ID for tracking
                 return try {
-                    val json = org.json.JSONObject(pingMessage.removeSuffix("\u0000\u0000"))
+                    val json = org.json.JSONObject(originalJson)
                     json.optString("id").takeIf { it.isNotEmpty() }
                 } catch (e: Exception) { null }
             } catch (e: Exception) {
@@ -348,7 +348,7 @@ class ClientManager(
         fun getInputStream() = socket.getInputStream()
         
         @Throws(IOException::class)
-        suspend fun sendMessage(message: String) {
+        suspend fun sendMessage(message: ByteArray) {
             writeLock.withLock {
                 protocolManager.sendMessage(socket.getOutputStream(), message)
             }

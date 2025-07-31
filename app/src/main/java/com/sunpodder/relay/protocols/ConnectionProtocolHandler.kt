@@ -16,7 +16,7 @@ class ConnectionProtocolHandler : BaseProtocolHandler {
     /**
      * Creates an acknowledgment message in response to a conn message
      */
-    fun createAckMessage(refId: String?, status: String = "ok", reason: String? = null): String {
+    fun createAckMessage(refId: String?, status: String = "ok", reason: String? = null): ByteArray {
         val ackJson = createBaseMessage("ack").apply {
             put("payload", JSONObject().apply {
                 refId?.let { put("ref_id", it) }

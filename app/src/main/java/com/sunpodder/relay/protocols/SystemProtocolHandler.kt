@@ -10,7 +10,7 @@ class SystemProtocolHandler : BaseProtocolHandler {
     /**
      * Creates a log message
      */
-    fun createLogMessage(message: String, level: String = "info"): String {
+    fun createLogMessage(message: String, level: String = "info"): ByteArray {
         val logJson = createBaseMessage("log").apply {
             put("payload", JSONObject().apply {
                 put("message", message)
@@ -23,7 +23,7 @@ class SystemProtocolHandler : BaseProtocolHandler {
     /**
      * Creates an error message
      */
-    fun createErrorMessage(error: String, code: Int = 0): String {
+    fun createErrorMessage(error: String, code: Int = 0): ByteArray {
         val errorJson = createBaseMessage("error").apply {
             put("payload", JSONObject().apply {
                 put("message", error)
@@ -36,7 +36,7 @@ class SystemProtocolHandler : BaseProtocolHandler {
     /**
      * Creates a status message
      */
-    fun createStatusMessage(status: String, data: JSONObject? = null): String {
+    fun createStatusMessage(status: String, data: JSONObject? = null): ByteArray {
         val statusJson = createBaseMessage("status").apply {
             put("payload", JSONObject().apply {
                 put("status", status)

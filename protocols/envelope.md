@@ -1,31 +1,50 @@
-
-# RFC: Protocol Envelope Format
+```md
+# RFC: Length-Prefixed Protocol Envelope Format
 
 ## 1. Overview
 
-All protocol messages are wrapped in a common envelope structure. This ensures consistency, extensibility, and easy parsing for all message types exchanged between Android and Desktop.
+This document defines the protocol envelope format and framing for communication between Android and Desktop systems. All messages use a length-prefixed JSON envelope structure to ensure consistent, efficient, and extensible communication.
 
-## 2. Envelope Structure
+## 2. Transport Framing
+
+Each message transmitted over the socket must be **prefixed with a 4-byte unsigned integer (big-endian)** indicating the length (in bytes) of the JSON message that follows.
+
+### Format
+
+```
+
++--------------------+-----------------------------+
+\| 4-byte length (u32)| JSON-encoded envelope bytes |
++--------------------+-----------------------------+
+
+````
+
+- The length is the number of bytes in the JSON payload (excluding the prefix).
+- The JSON must be UTF-8 encoded.
+
+## 3. Envelope Structure
 
 ```jsonc
 {
-  "type": "<type>",         // Required. Protocol message type (e.g., conn, ack, ping, pong, sms, notification, etc.)
-  "id": "uuid-123",         // Optional. Unique ID for tracking/correlation
-  "timestamp": 1729577323,   // Optional. UNIX epoch seconds
-  "payload": { ... }         // Required. Protocol-specific data
+  "type": "<type>",         // Required. Message type (e.g., ping, sms, notification)
+  "id": "uuid-123",         // Optional. Unique identifier for tracking
+  "timestamp": 1729577323,  // Optional. UNIX epoch seconds (UTC)
+  "payload": { ... }        // Required. Protocol-specific data
 }
-```
+````
 
-## 3. Field Descriptions
+## 4. Field Descriptions
 
-| Field      | Type     | Required | Description                                                      |
-|------------|----------|----------|------------------------------------------------------------------|
-| `type`     | string   | Yes      | Protocol message type (e.g., `conn`, `ack`, `ping`, `sms`, etc.) |
-| `id`       | string   | No       | Unique identifier for tracking/correlation                       |
-| `timestamp`| integer  | No       | UNIX epoch seconds (UTC)                                         |
-| `payload`  | object   | Yes      | Protocol-specific message body                                   |
+| Field       | Type    | Required | Description                                                |
+| ----------- | ------- | -------- | ---------------------------------------------------------- |
+| `type`      | string  | Yes      | Protocol message type (e.g., `conn`, `ack`, `ping`, `sms`) |
+| `id`        | string  | No       | Unique ID for request/response correlation                 |
+| `timestamp` | integer | No       | UNIX timestamp in seconds (UTC)                            |
+| `payload`   | object  | Yes      | Message-specific payload                                   |
 
-## 4. Example
+## 5. Example Message
+
+### Envelope
 
 ```json
 {
@@ -38,7 +57,16 @@ All protocol messages are wrapped in a common envelope structure. This ensures c
 }
 ```
 
-## 5. Notes
-- All protocol messages **must** use this envelope format.
-- The `id` field is recommended for request/response correlation, especially for `ping`/`pong` and `conn`/`ack`.
-- The `timestamp` field is optional but recommended for debugging and ordering.
+### Full Transmission (Wire Format)
+
+```
+[0x00 0x00 0x00 0x58] // 88-byte length prefix
+{"type":"ping","id":"ping-001","timestamp":1729577323,"payload":{"device":"Sun-PC"}}
+```
+
+## 6. Requirements
+
+* All messages **must** be framed using the 4-byte length prefix format.
+* The envelope **must** be a UTF-8 encoded JSON object.
+* All protocol message types **must** conform to this structure.
+* Clients and servers **must** read the exact number of bytes specified by the length prefix before attempting to parse the JSON.

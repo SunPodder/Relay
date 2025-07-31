@@ -15,7 +15,7 @@ class HeartbeatProtocolHandler : BaseProtocolHandler {
     /**
      * Creates a ping message for keep-alive
      */
-    fun createPingMessage(): String {
+    fun createPingMessage(): ByteArray {
         val pingJson = createBaseMessage("ping").apply {
             put("payload", JSONObject().apply {
                 put("device", Build.MODEL)
@@ -27,7 +27,7 @@ class HeartbeatProtocolHandler : BaseProtocolHandler {
     /**
      * Creates a pong message in response to a ping
      */
-    fun createPongMessage(pingId: String? = null): String {
+    fun createPongMessage(pingId: String? = null): ByteArray {
         val pongJson = createBaseMessage("pong", pingId).apply {
             put("payload", JSONObject().apply {
                 put("device", Build.MODEL)
