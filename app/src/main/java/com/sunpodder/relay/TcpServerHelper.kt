@@ -104,12 +104,10 @@ class TcpServerHelper {
         clientManager.getClientsByPlatform(platform)
     
     fun getServerStatus(): String {
-        val serverStatus = tcpServer.getServerStatus()
-        val clientCount = clientManager.getConnectedClientsCount()
         val heartbeatStatus = heartbeatManager.getHeartbeatStatus()
         
         return if (tcpServer.isServerRunning()) {
-            "$serverStatus ($clientCount clients) - Heartbeat: $heartbeatStatus"
+            "Heartbeat: $heartbeatStatus"
         } else {
             "Stopped"
         }

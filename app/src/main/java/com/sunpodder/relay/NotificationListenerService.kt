@@ -65,7 +65,7 @@ class NotificationListenerService : AndroidNotificationListenerService() {
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
         super.onNotificationRemoved(sbn)
         
-        sbn?.let { notification ->
+        sbn?.let { _ ->
             // TODO: Send notification dismiss message to clients
         }
     }

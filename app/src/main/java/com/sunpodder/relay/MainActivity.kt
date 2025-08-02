@@ -12,8 +12,13 @@ import android.text.Html
 import android.widget.Button
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.LinearLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.NotificationManagerCompat
+import android.net.Uri;
+import android.content.Context
+import android.os.PowerManager
+import android.widget.Toast
 
 class MainActivity : AppCompatActivity(), UILogger.LogListener {
 
@@ -31,6 +36,9 @@ class MainActivity : AppCompatActivity(), UILogger.LogListener {
     private lateinit var tvClientInfo: TextView
     private lateinit var scrollView: ScrollView
     private lateinit var btnClearLogs: Button
+    private lateinit var btnServiceControl: Button
+    private lateinit var layoutBatteryAlert: LinearLayout
+    private lateinit var btnBatterySettings: Button
     
     // Log display management
     private val logDisplayBuilder = StringBuilder()
@@ -64,6 +72,9 @@ class MainActivity : AppCompatActivity(), UILogger.LogListener {
         
         // Initialize UI elements
         initializeUI()
+
+        // Check battery optimization and show alert if needed
+        checkBatteryOptimization()
         
         // Register as log listener
         UILogger.addListener(this)
@@ -100,6 +111,12 @@ class MainActivity : AppCompatActivity(), UILogger.LogListener {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        // Recheck battery optimization when returning from settings
+        checkBatteryOptimization()
+    }
+
     private fun initializeUI() {
         tvLogs = findViewById(R.id.tvLogs)
         tvServiceStatus = findViewById(R.id.tvServiceStatus)
@@ -107,11 +124,26 @@ class MainActivity : AppCompatActivity(), UILogger.LogListener {
         tvClientInfo = findViewById(R.id.tvClientInfo)
         scrollView = findViewById(R.id.scrollViewLogs)
         btnClearLogs = findViewById(R.id.btnClearLogs)
+        btnServiceControl = findViewById(R.id.btnServiceControl)
+        layoutBatteryAlert = findViewById(R.id.layoutBatteryAlert)
+        btnBatterySettings = findViewById(R.id.btnBatterySettings)
         
         btnClearLogs.setOnClickListener {
             UILogger.clearLogs()
             logDisplayBuilder.clear()
             tvLogs.text = Html.fromHtml("<font color='#AAAAAA'>Logs cleared...</font>", Html.FROM_HTML_MODE_LEGACY)
+        }
+        
+        btnServiceControl.setOnClickListener {
+            if (relayService?.isRunning() == true) {
+                stopRelayService()
+            } else {
+                startRelayService()
+            }
+        }
+        
+        btnBatterySettings.setOnClickListener {
+            openBatteryOptimizationSettings()
         }
     }
     
@@ -175,13 +207,16 @@ class MainActivity : AppCompatActivity(), UILogger.LogListener {
                 val clientsInfo = service.getConnectedClientsInfo()
                 
                 tvServiceStatus.text = "Service Status: ${if (isRunning) "Running" else "Stopped"}"
-                tvServerInfo.text = "Server: $serviceName on port $port ($tcpStatus)"
-                
+                tvServerInfo.text = "Server: $serviceName on port $port\n$tcpStatus"
+
+                // Update service control button text
+                btnServiceControl.text = if (isRunning) "Stop Service" else "Start Service"
+
                 // Create detailed client info text
                 val clientInfoText = if (clientsInfo.isEmpty()) {
                     "Clients: None connected"
                 } else {
-                    val clientDetails = clientsInfo.map { (address, info) ->
+                    val clientDetails = clientsInfo.map { (_, info) ->
                         "${info.deviceName} (${info.platform})"
                     }.joinToString(", ")
                     "Clients ($clientCount): $clientDetails"
@@ -191,6 +226,7 @@ class MainActivity : AppCompatActivity(), UILogger.LogListener {
                 tvServiceStatus.text = "Service Status: Not connected"
                 tvServerInfo.text = "Server: Not available"
                 tvClientInfo.text = "Clients: Not available"
+                btnServiceControl.text = "Start Service"
             }
         }
     }
@@ -232,6 +268,25 @@ class MainActivity : AppCompatActivity(), UILogger.LogListener {
                 startService(serviceIntent)
             }
         }
+    }
+
+    private fun checkBatteryOptimization() {
+        val packageName = "com.sunpodder.relay"
+        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+        if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+            // Show the battery optimization alert in UI
+            layoutBatteryAlert.visibility = android.view.View.VISIBLE
+        } else {
+            // Hide the alert if battery optimization is already disabled
+            layoutBatteryAlert.visibility = android.view.View.GONE
+        }
+    }
+
+    private fun openBatteryOptimizationSettings() {
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+            data = Uri.parse("package:${packageName}")
+        }
+        startActivity(intent)
     }
 
     // Example methods to interact with the relay service

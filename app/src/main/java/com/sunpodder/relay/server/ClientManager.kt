@@ -24,8 +24,9 @@ class ClientManager(
     // Thread-safe collections for client management
     private val connectedClients = ConcurrentHashMap<String, ClientHandler>()
     private val clientInfoMap = ConcurrentHashMap<String, ClientInfo>()
-    
+
     // Dedicated dispatcher for client I/O operations
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private val clientIODispatcher = Dispatchers.IO.limitedParallelism(16)
     
     // Supervisor scope for managing client coroutines
