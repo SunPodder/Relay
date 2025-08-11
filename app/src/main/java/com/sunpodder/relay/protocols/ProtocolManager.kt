@@ -152,17 +152,15 @@ class ProtocolManager : BaseProtocolHandler {
         actions: List<NotificationAction> = emptyList()
     ): ByteArray = notification.createNotificationMessage(id, title, body, app, packageName, timestamp, canReply, actions)
     
-    fun parseNotificationMessage(jsonMessage: String): NotificationData? =
-        notification.parseNotificationMessage(jsonMessage)
-    
-    fun parseNotificationReplyMessage(jsonMessage: String): NotificationReply? =
-        notification.parseNotificationReplyMessage(jsonMessage)
+    fun createNotificationActionMessage(
+        notificationId: String,
+        type: NotificationActionType,
+        key: String? = null,
+        body: String? = null
+    ): ByteArray = notification.createNotificationActionMessage(notificationId, type, key, body)
     
     fun parseNotificationActionMessage(jsonMessage: String): NotificationActionRequest? =
         notification.parseNotificationActionMessage(jsonMessage)
-    
-    fun parseNotificationDismissMessage(jsonMessage: String): NotificationDismiss? =
-        notification.parseNotificationDismissMessage(jsonMessage)
     
     // System Protocol
     fun createLogMessage(message: String, level: String = "info"): ByteArray =

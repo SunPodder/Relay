@@ -153,17 +153,16 @@ class RelaySocketService : Service() {
 
     private fun setupTcpServerCallbacks() {
         tcpServerHelper.onClientConnected = { clientAddress ->
-            UILogger.i(TAG, "Client connected: $clientAddress")
             // TODO: Handle client connection (maybe notify NotificationListenerService)
         }
 
         tcpServerHelper.onClientDisconnected = { clientAddress ->
-            UILogger.i(TAG, "Client disconnected: $clientAddress")
             // TODO: Handle client disconnection
         }
 
-        tcpServerHelper.onDataReceived = { _, _ ->
-            // TODO: Process received data
+        tcpServerHelper.onDataReceived = { clientAddress, jsonMessage ->
+            // Process notification action and reply messages
+            handleIncomingMessage(clientAddress, jsonMessage)
         }
 
         tcpServerHelper.onError = { exception ->
@@ -283,6 +282,29 @@ class RelaySocketService : Service() {
             }
         } else {
             UILogger.w(TAG, "Service is not running, cannot send status")
+        }
+    }
+
+    private fun handleIncomingMessage(clientAddress: String, jsonMessage: String) {
+        try {
+            val protocolManager = com.sunpodder.relay.protocols.ProtocolManager()
+            val messageType = protocolManager.parseMessageType(jsonMessage)
+            
+            when (messageType) {
+                "notification_action" -> {
+                    val actionRequest = protocolManager.parseNotificationActionMessage(jsonMessage)
+                    if (actionRequest != null) {
+                        NotificationListenerService.instance?.handleNotificationAction(actionRequest)
+                    } else {
+                        UILogger.w(TAG, "Failed to parse notification_action message from $clientAddress")
+                    }
+                }
+                else -> {
+                    UILogger.d(TAG, "Unhandled message type '$messageType' from $clientAddress")
+                }
+            }
+        } catch (e: Exception) {
+            UILogger.e(TAG, "Error handling incoming message from $clientAddress", e)
         }
     }
 }

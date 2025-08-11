@@ -9,7 +9,7 @@ import org.json.JSONObject
 class NotificationProtocolHandler : BaseProtocolHandler {
 
     /**
-     * Creates a notification message (Android → Desktop)
+     * Creates a notification message
      */
     fun createNotificationMessage(
         id: String,
@@ -30,13 +30,13 @@ class NotificationProtocolHandler : BaseProtocolHandler {
                 put("package", packageName)
                 put("timestamp", timestamp)
                 put("can_reply", canReply)
-                
+
                 // Add actions array
                 val actionsArray = JSONArray()
                 actions.forEach { action ->
                     actionsArray.put(JSONObject().apply {
                         put("title", action.title)
-                        put("type", action.type)
+                        put("type", action.type.value)
                         put("key", action.key)
                     })
                 }
@@ -47,92 +47,27 @@ class NotificationProtocolHandler : BaseProtocolHandler {
     }
 
     /**
-     * Creates a notification reply message (Desktop → Android)
-     */
-    fun createNotificationReplyMessage(
-        notificationId: String,
-        key: String,
-        text: String
-    ): ByteArray {
-        val replyJson = createBaseMessage("notification_reply").apply {
-            put("payload", JSONObject().apply {
-                put("id", notificationId)
-                put("key", key)
-                put("text", text)
-            })
-        }
-        return formatMessage(replyJson.toString())
-    }
-
-    /**
-     * Creates a notification action message (Desktop → Android)
+     * Creates a notification action message for dismiss (Android → Desktop or Desktop → Android)
      */
     fun createNotificationActionMessage(
         notificationId: String,
-        key: String
+        type: NotificationActionType,
+        key: String? = null,
+        body: String? = null
     ): ByteArray {
         val actionJson = createBaseMessage("notification_action").apply {
             put("payload", JSONObject().apply {
                 put("id", notificationId)
-                put("key", key)
+                put("type", type.value)
+                if (key != null) {
+                    put("key", key)
+                }
+                if (body != null) {
+                    put("body", body)
+                }
             })
         }
         return formatMessage(actionJson.toString())
-    }
-
-    /**
-     * Creates a notification dismiss message (Desktop → Android)
-     */
-    fun createNotificationDismissMessage(
-        notificationId: String
-    ): ByteArray {
-        val dismissJson = createBaseMessage("notification_dismiss").apply {
-            put("payload", JSONObject().apply {
-                put("id", notificationId)
-            })
-        }
-        return formatMessage(dismissJson.toString())
-    }
-
-    /**
-     * Parses a notification message and extracts the payload
-     */
-    fun parseNotificationMessage(jsonMessage: String): NotificationData? {
-        return try {
-            val json = JSONObject(jsonMessage)
-            val payload = json.getJSONObject("payload")
-            
-            NotificationData(
-                id = payload.getString("id"),
-                title = payload.optString("title", ""),
-                body = payload.optString("body", ""),
-                app = payload.optString("app", ""),
-                packageName = payload.getString("package"),
-                timestamp = payload.getLong("timestamp"),
-                canReply = payload.optBoolean("can_reply", false),
-                actions = parseActions(payload.optJSONArray("actions"))
-            )
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    /**
-     * Parses notification reply message
-     */
-    fun parseNotificationReplyMessage(jsonMessage: String): NotificationReply? {
-        return try {
-            val json = JSONObject(jsonMessage)
-            val payload = json.getJSONObject("payload")
-            
-            NotificationReply(
-                id = payload.getString("id"),
-                key = payload.getString("key"),
-                text = payload.getString("text")
-            )
-        } catch (e: Exception) {
-            null
-        }
     }
 
     /**
@@ -143,25 +78,15 @@ class NotificationProtocolHandler : BaseProtocolHandler {
             val json = JSONObject(jsonMessage)
             val payload = json.getJSONObject("payload")
             
+            val typeString = payload.getString("type")
+            val actionType = NotificationActionType.fromString(typeString)
+                ?: return null // Invalid action type
+            
             NotificationActionRequest(
                 id = payload.getString("id"),
-                key = payload.getString("key")
-            )
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    /**
-     * Parses notification dismiss message
-     */
-    fun parseNotificationDismissMessage(jsonMessage: String): NotificationDismiss? {
-        return try {
-            val json = JSONObject(jsonMessage)
-            val payload = json.getJSONObject("payload")
-            
-            NotificationDismiss(
-                id = payload.getString("id")
+                key = payload.optString("key").takeIf { it.isNotEmpty() },
+                type = actionType,
+                body = payload.optString("body").takeIf { it.isNotEmpty() }
             )
         } catch (e: Exception) {
             null
@@ -174,15 +99,35 @@ class NotificationProtocolHandler : BaseProtocolHandler {
         val actions = mutableListOf<NotificationAction>()
         for (i in 0 until actionsArray.length()) {
             val actionObj = actionsArray.getJSONObject(i)
-            actions.add(
-                NotificationAction(
-                    title = actionObj.getString("title"),
-                    type = actionObj.getString("type"),
-                    key = actionObj.getString("key")
+            val typeString = actionObj.getString("type")
+            val actionType = NotificationActionType.fromString(typeString)
+            
+            if (actionType != null) {
+                actions.add(
+                    NotificationAction(
+                        title = actionObj.getString("title"),
+                        type = actionType,
+                        key = actionObj.getString("key")
+                    )
                 )
-            )
+            }
         }
         return actions
+    }
+}
+
+/**
+ * Enums for notification protocol
+ */
+enum class NotificationActionType(val value: String) {
+    REMOTE_INPUT("remote_input"),
+    ACTION("action"),
+    DISMISS("notification_dismiss");
+    
+    companion object {
+        fun fromString(value: String): NotificationActionType? {
+            return values().find { it.value == value }
+        }
     }
 }
 
@@ -191,7 +136,7 @@ class NotificationProtocolHandler : BaseProtocolHandler {
  */
 data class NotificationAction(
     val title: String,
-    val type: String, // "remote_input" or "action"
+    val type: NotificationActionType,
     val key: String
 )
 
@@ -206,15 +151,11 @@ data class NotificationData(
     val actions: List<NotificationAction>
 )
 
-data class NotificationReply(
-    val id: String,
-    val key: String,
-    val text: String
-)
-
 data class NotificationActionRequest(
     val id: String,
-    val key: String
+    val key: String? = null, // Not needed for dismiss
+    val type: NotificationActionType,
+    val body: String? = null
 )
 
 data class NotificationDismiss(

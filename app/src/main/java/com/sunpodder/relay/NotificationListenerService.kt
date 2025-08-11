@@ -7,7 +7,10 @@ import android.os.Bundle
 import android.service.notification.NotificationListenerService as AndroidNotificationListenerService
 import android.service.notification.StatusBarNotification
 import com.sunpodder.relay.protocols.NotificationAction
+import com.sunpodder.relay.protocols.NotificationActionRequest
+import com.sunpodder.relay.protocols.NotificationActionType
 import kotlinx.coroutines.*
+import java.util.concurrent.ConcurrentHashMap
 
 class NotificationListenerService : AndroidNotificationListenerService() {
 
@@ -19,6 +22,12 @@ class NotificationListenerService : AndroidNotificationListenerService() {
 
     // Reference to the TCP server helper for broadcasting notifications
     private var tcpServerHelper: TcpServerHelper? = null
+    
+    // Keep track of active notifications so we can interact with them
+    private val activeNotifications = ConcurrentHashMap<String, StatusBarNotification>()
+    
+    // Track notifications that were dismissed remotely to avoid sending dismiss signals back
+    private val remotelyDismissedNotifications = mutableSetOf<String>()
 
     override fun onCreate() {
         super.onCreate()
@@ -58,6 +67,10 @@ class NotificationListenerService : AndroidNotificationListenerService() {
         super.onNotificationPosted(sbn)
         
         sbn?.let { notification ->
+            // Store the notification for later interaction
+            val notificationId = generateNotificationId(notification)
+            activeNotifications[notificationId] = notification
+            
             extractAndBroadcastNotification(notification)
         }
     }
@@ -65,8 +78,15 @@ class NotificationListenerService : AndroidNotificationListenerService() {
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
         super.onNotificationRemoved(sbn)
         
-        sbn?.let { _ ->
-            // TODO: Send notification dismiss message to clients
+        sbn?.let { notification ->
+            // Remove from active notifications
+            val notificationId = generateNotificationId(notification)
+            activeNotifications.remove(notificationId)
+            
+            // Only send dismiss signal if this notification wasn't dismissed remotely
+            if (!remotelyDismissedNotifications.remove(notificationId)) {
+                sendDismissSignal(notificationId)
+            }
         }
     }
 
@@ -101,10 +121,10 @@ class NotificationListenerService : AndroidNotificationListenerService() {
 
         // Extract actions
         val actions = extractNotificationActions(notification)
-        val canReply = actions.any { it.type == "remote_input" }
+        val canReply = actions.any { it.type == NotificationActionType.REMOTE_INPUT }
 
         // Use StatusBarNotification key as unique ID, fallback to package + timestamp
-        val notificationId = key ?: "${packageName}_${postTime}"
+        val notificationId = generateNotificationId(sbn)
         // Broadcast to connected clients
         tcpServerHelper?.let { server ->
             CoroutineScope(Dispatchers.IO).launch {
@@ -187,9 +207,9 @@ class NotificationListenerService : AndroidNotificationListenerService() {
         
         notification.actions?.forEach { action ->
             val actionType = if (action.remoteInputs?.isNotEmpty() == true) {
-                "remote_input"
+                NotificationActionType.REMOTE_INPUT
             } else {
-                "action"
+                NotificationActionType.ACTION
             }
             
             // Use action title as key, or generate one
@@ -205,6 +225,148 @@ class NotificationListenerService : AndroidNotificationListenerService() {
         }
         
         return actions
+    }
+
+    /**
+     * Handles notification action requests from desktop clients
+     * This handles regular actions, remote input (replies), and dismissals
+     */
+    fun handleNotificationAction(actionRequest: NotificationActionRequest) {
+        when (actionRequest.type) {
+            NotificationActionType.REMOTE_INPUT -> {
+                handleRemoteInputAction(actionRequest)
+            }
+            NotificationActionType.ACTION -> {
+                handleRegularAction(actionRequest)
+            }
+            NotificationActionType.DISMISS -> {
+                handleDismissAction(actionRequest)
+            }
+        }
+    }
+
+    private fun handleRemoteInputAction(actionRequest: NotificationActionRequest) {
+        val sbn = activeNotifications[actionRequest.id]
+        if (sbn == null) {
+            UILogger.w(TAG, "Notification not found for action: ${actionRequest.id}")
+            return
+        }
+
+        val notification = sbn.notification
+        val actions = notification.actions ?: return
+
+        // Find the action by key
+        val actionIndex = actions.indexOfFirst { action ->
+            val actionKey = action.title?.toString()?.lowercase()?.replace(" ", "_") ?: "action_${actions.indexOf(action)}"
+            actionKey == actionRequest.key
+        }
+
+        if (actionIndex == -1) {
+            UILogger.w(TAG, "Action not found: ${actionRequest.key} for notification ${actionRequest.id}")
+            return
+        }
+
+        val action = actions[actionIndex]
+        val remoteInput = action.remoteInputs?.firstOrNull()
+        if (remoteInput == null) {
+            UILogger.w(TAG, "No remote input found for action ${actionRequest.key}")
+            return
+        }
+
+        val replyText = actionRequest.body
+        if (replyText.isNullOrEmpty()) {
+            UILogger.w(TAG, "No reply text provided for remote input action ${actionRequest.key}")
+            return
+        }
+
+        try {
+            // Create the reply intent
+            val replyIntent = Intent()
+            val bundle = Bundle()
+            bundle.putCharSequence(remoteInput.resultKey, replyText)
+            RemoteInput.addResultsToIntent(arrayOf(remoteInput), replyIntent, bundle)
+
+            // Send the reply
+            action.actionIntent?.send(this, 0, replyIntent)
+        } catch (e: Exception) {
+            UILogger.e(TAG, "Failed to send reply for action '${actionRequest.key}' on notification ${actionRequest.id}", e)
+        }
+    }
+
+    private fun handleRegularAction(actionRequest: NotificationActionRequest) {
+        val sbn = activeNotifications[actionRequest.id]
+        if (sbn == null) {
+            UILogger.w(TAG, "Notification not found for action: ${actionRequest.id}")
+            return
+        }
+
+        val notification = sbn.notification
+        val actions = notification.actions ?: return
+
+        // Find the action by key
+        val actionIndex = actions.indexOfFirst { action ->
+            val actionKey = action.title?.toString()?.lowercase()?.replace(" ", "_") ?: "action_${actions.indexOf(action)}"
+            actionKey == actionRequest.key
+        }
+
+        if (actionIndex == -1) {
+            UILogger.w(TAG, "Action not found: ${actionRequest.key} for notification ${actionRequest.id}")
+            return
+        }
+
+        val action = actions[actionIndex]
+        
+        try {
+            // Execute the action
+            action.actionIntent?.send()
+        } catch (e: Exception) {
+            UILogger.e(TAG, "Failed to trigger action '${actionRequest.key}' for notification ${actionRequest.id}", e)
+        }
+    }
+
+    private fun handleDismissAction(actionRequest: NotificationActionRequest) {
+        val sbn = activeNotifications[actionRequest.id]
+        if (sbn == null) {
+            UILogger.w(TAG, "Notification not found for dismiss: ${actionRequest.id}")
+            return
+        }
+
+        try {
+            // Mark this notification as remotely dismissed to avoid sending dismiss signal back
+            remotelyDismissedNotifications.add(actionRequest.id)
+            
+            // Cancel the notification using the notification manager
+            cancelNotification(sbn.key)
+        } catch (e: Exception) {
+            UILogger.e(TAG, "Failed to dismiss notification ${actionRequest.id}", e)
+            // Remove from set if dismissal failed
+            remotelyDismissedNotifications.remove(actionRequest.id)
+        }
+    }
+
+    /**
+     * Send dismiss signal to connected clients when a notification is dismissed locally
+     */
+    private fun sendDismissSignal(notificationId: String) {
+        tcpServerHelper?.let { server ->
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val protocolManager = com.sunpodder.relay.protocols.ProtocolManager()
+                    val dismissMessage = protocolManager.createNotificationActionMessage(
+                        notificationId = notificationId,
+                        type = NotificationActionType.DISMISS
+                    )
+                    server.sendToAllClients(dismissMessage)
+                } catch (e: Exception) {
+                    UILogger.e(TAG, "Failed to send dismiss signal for notification $notificationId", e)
+                }
+            }
+        }
+    }
+
+    private fun generateNotificationId(sbn: StatusBarNotification): String {
+        // Use StatusBarNotification key as unique ID, fallback to package + timestamp
+        return sbn.key ?: "${sbn.packageName}_${sbn.postTime}"
     }
 
     override fun onListenerConnected() {
